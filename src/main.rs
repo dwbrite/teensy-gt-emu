@@ -2,24 +2,18 @@
 #![no_main]
 
 use teensy4_panic as _;
+
 extern crate libm;
 
 #[rtic::app(device = teensy4_bsp, peripherals = true, dispatchers = [KPP])]
 mod app {
     use teensy4_bsp as bsp;
     use bsp::board;
-    use bsp::hal::{
-        flexpwm::{
-            Channel, ClockSelect, LoadMode, Prescaler, Submodule, FULL_RELOAD_VALUE_REGISTER,
-            PairOperation,
-        },
-    };
     use imxrt_log as logging;
     use rtic_monotonics::systick::{Systick, *};
-    use teensy4_bsp::hal;
-
-    const PWM_FREQUENCY: u32 = 150_000_000;
-    const PWM_PRESCALER: Prescaler = Prescaler::Prescaler1;
+    use teensy4_bsp::hal::gpio;
+    use teensy4_bsp::hal::gpio::Port;
+    use teensy4_bsp::ral::gpio::{GPIO2, GPIO3, GPIO4, GPIO5};
 
     static mut SINE_TABLE: [u8; 256] = [0; 256];
 
@@ -39,9 +33,12 @@ mod app {
 
     #[local]
     struct Local {
-        pwm: Submodule<1, 3>,
+        p33: gpio::Output<bsp::pins::t41::P33>,
+        p34: gpio::Output<bsp::pins::t41::P34>,
+        p35: gpio::Output<bsp::pins::t41::P35>,
+        p36: gpio::Output<bsp::pins::t41::P36>,
+
         phase: u16,
-        max_duty: i16,
         poller: logging::Poller,
     }
 
@@ -51,43 +48,21 @@ mod app {
             mut gpio2,
             pins,
             usb,
-            flexpwm1,
             ..
         } = board::t41(cx.device);
 
         fill_sine_table();
 
-        let (mut pwm, (mut _sm0, _, _, mut sm3)) = flexpwm1;
         let poller = logging::log::usbd(usb, logging::Interrupts::Enabled).unwrap();
-
         let led = board::led(&mut gpio2, pins.p13);
 
-        let pwm_freq = 25_000;
-        let reload = PWM_FREQUENCY / pwm_freq;
-        let half_reload = (reload / 2) as i16;
+        let mut gpio2 = Port::new(unsafe { GPIO2::instance() });
+        let mut gpio4 = Port::new(unsafe { GPIO4::instance() });
 
-        sm3.set_debug_enable(true);
-        sm3.set_wait_enable(true);
-        sm3.set_clock_select(ClockSelect::Ipg);
-        sm3.set_prescaler(PWM_PRESCALER);
-        sm3.set_pair_operation(PairOperation::Independent);
-        sm3.set_load_mode(LoadMode::reload_full());
-        sm3.set_load_frequency(1);
-        sm3.set_initial_count(&pwm, -half_reload);
-        sm3.set_value(FULL_RELOAD_VALUE_REGISTER, half_reload);
-        sm3.set_turn_on(Channel::A, -1);
-        sm3.set_turn_off(Channel::A, 1);
-        sm3.set_output_enable(&mut pwm, Channel::A, true);
-
-        let output_a = hal::flexpwm::Output::new_a(pins.p8);
-        // Set the turn on / off count values.
-        output_a.set_turn_on(&sm3, i16::MIN / 2);
-        output_a.set_turn_off(&sm3, i16::MAX / 2);
-        // Enable the PWM output.
-        output_a.set_output_enable(&mut pwm, true);
-
-        sm3.set_load_ok(&mut pwm);
-        sm3.set_running(&mut pwm, true);
+        let p33 = gpio4.output(pins.p33);
+        let p34 = gpio2.output(pins.p34);
+        let p35 = gpio2.output(pins.p35);
+        let p36 = gpio2.output(pins.p36);
 
         Systick::start(
             cx.core.SYST,
@@ -96,37 +71,56 @@ mod app {
         );
 
         generate::spawn().unwrap();
-
         led.toggle();
 
         (
             Shared {},
             Local {
-                pwm: sm3,
+                p33, p34, p35, p36,
                 phase: 0,
-                max_duty: reload as i16,
                 poller,
             },
         )
     }
 
-    #[task(local = [pwm, phase, max_duty])]
+    #[task(local = [p33, p34, p35, p36, phase])]
     async fn generate(cx: generate::Context) {
-        let phase_step: u16 = 300;
+        let phase_step: u16 = 1;
 
         loop {
             let index = (*cx.local.phase >> 8) as usize;
             let sample = unsafe { SINE_TABLE[index] };
+            let value = sample >> 4; // Top 4 bits
 
-            let centered = sample as i16 - 128;
-            let duty = (centered * *cx.local.max_duty) / 255;
-            cx.local.pwm.set_turn_on(Channel::A, -duty);
-            cx.local.pwm.set_turn_off(Channel::A, duty);
+            if (value & 0b0001) != 0 {
+                cx.local.p33.set();
+            } else {
+                cx.local.p33.clear();
+            }
+
+            if (value & 0b0010) != 0 {
+                cx.local.p34.set();
+            } else {
+                cx.local.p34.clear();
+            }
+
+            if (value & 0b0100) != 0 {
+                cx.local.p35.set();
+            } else {
+                cx.local.p35.clear();
+            }
+
+            if (value & 0b1000) != 0 {
+                cx.local.p36.set();
+            } else {
+                cx.local.p36.clear();
+            }
 
             *cx.local.phase = cx.local.phase.wrapping_add(phase_step);
             Systick::delay(100.micros()).await;
         }
     }
+
 
     #[task(binds = USB_OTG1, local = [poller])]
     fn log_over_usb(cx: log_over_usb::Context) {
