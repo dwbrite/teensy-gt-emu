@@ -9,19 +9,43 @@ rtic-monotonics = { version = "1", default-features = false, features = ["cortex
 
 # Remove these if you don't want logging.
 imxrt-log = { version = "0.1", default-features = false, features = ["log", "usbd"] }
-log = { version = "0.4", features = ["max_level_debug", "release_max_level_info"] }
+log = { version = "0.4", default-features = false, features = ["max_level_trace", "release_max_level_info"] }
 
 teensy4-panic = { version = "0.2", features = ["log"] }
+linked_list_allocator = "0.9"
 libm = "0.2.11"
 
+gametank-emulator-core = { path = "../gametank-emulator-core"}
+
+rtrb = { version = "0.3", default-features = false, features = [] }
+
+imxrt-rt = "0.1"
+
+spin = "0.9.8"
+
+bumpalo = { version = "3", default-features = false }
+
+
 [dependencies.teensy4-bsp]
-version = "0.5"
+path = "teensy4-rs"
 features = [
     # Use the BSP's runtime.
     "rt",
 ]
 
+
+[build-dependencies]
+imxrt-rt = "0.1"
+
+
+
 # Don't optimize build dependencies, like proc macros.
 # Helps with build times.
 [profile.release.build-override]
-opt-level = 0
+opt-level = 3
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = true
