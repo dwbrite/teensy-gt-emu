@@ -15,9 +15,9 @@ teensy4-panic = { version = "0.2", features = ["log"] }
 linked_list_allocator = "0.9"
 libm = "0.2.11"
 
-gametank-emulator-core = { path = "../gametank-emulator-core"}
-
-rtrb = { version = "0.3", default-features = false, features = [] }
+#gametank-emulator-core = { path = "../gametank-emulator-core"}
+#
+#rtrb = { version = "0.3.2", default-features = false, features = [] }
 
 imxrt-rt = "0.1"
 

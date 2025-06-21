@@ -4,5 +4,7 @@ target = "thumbv7em-none-eabihf"
 [target.thumbv7em-none-eabihf]
 rustflags = [
     "-C", "target-cpu=cortex-m7",
+    "-Z", "tune-cpu=cortex-m7",
+#    "-C", "target-feature=+m7,+dsp,+zcz,+hwdiv,+thumb2",
     "-C", "link-arg=-Tt4link.x",     # or your linker script
 ]
