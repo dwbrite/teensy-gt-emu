@@ -9,7 +9,7 @@ fn main() {
         })
         .heap(Memory::Ocram)
         .uninit(Memory::Ocram)
-        .heap_size(640 * 1024)
+        .heap_size(32 * 1024)
         .stack(Memory::Dtcm)
         .stack_size(12  * 1024)
         // .stack_size_env_override("TEENSY4_STACK_SIZE")

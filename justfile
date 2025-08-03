@@ -3,4 +3,7 @@ build:
     cargo objcopy --release -- -O ihex teensy-gt-emu.hex
 
 flash: build
-    teensy_loader_cli -mmcu=TEENSY41 -w teensy-gt-emu.hex
+    - tycmd upload -w --nocheck --noreset teensy-gt-emu.hex
+    tycmd upload -w --nocheck --noreset teensy-gt-emu.hex
+    - tycmd reset
+    sudo tycmd monitor
